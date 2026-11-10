@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>পিচ রিপোর্ট – লাইভ ক্রিকেট স্কোর</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Hind+Siliguri:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c2620; --panel:#123428; --line:#25503f;
+  --ball:#d3202f; --sand:#eadfb9; --chalk:#f6f5ee; --light:#f4d65a; --mute:#9fb8ac;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--chalk);font-family:'Hind Siliguri',system-ui,sans-serif;line-height:1.5;min-height:100vh}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0 22px}
+.logo{display:flex;align-items:center;gap:10px;font-family:'Big Shoulders Display',sans-serif;font-weight:900;font-size:30px;letter-spacing:.5px}
+.ball{width:28px;height:28px;border-radius:50%;background:var(--ball);position:relative;flex:none;animation:spin 9s linear infinite}
+.ball::before,.ball::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:0;border-left:2px dashed var(--sand);transform:translateX(-5px)}
+.ball::after{transform:translateX(3px)}
+@keyframes spin{to{transform:rotate(360deg)}}
+button{font:inherit;cursor:pointer;border:0;color:inherit}
+.refresh{background:var(--light);color:#1b2a10;font-weight:600;padding:8px 16px;border-radius:999px}
+.refresh:active{transform:scale(.96)}
+.hero{border-left:6px solid var(--ball);padding:6px 0 6px 16px;margin-bottom:24px}
+.hero h1{font-family:'Big Shoulders Display',sans-serif;font-size:clamp(34px,8vw,60px);line-height:1;font-weight:900}
+.hero p{color:var(--mute);margin-top:6px}
+.tabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto}
+.tab{background:var(--panel);padding:9px 18px;border-radius:10px;font-weight:500;white-space:nowrap;border:1px solid var(--line)}
+.tab[aria-selected=true]{background:var(--sand);color:#1d2a1f;border-color:var(--sand)}
+.tab:focus-visible,.refresh:focus-visible{outline:3px solid var(--light);outline-offset:2px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px 22px 6px 22px;padding:16px;position:relative}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--mute);margin-bottom:12px}
+.fmt{background:var(--bg);border:1px solid var(--line);padding:1px 9px;border-radius:99px;color:var(--sand);font-weight:600}
+.live{color:#fff;background:var(--ball);padding:1px 9px;border-radius:99px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.live i{width:7px;height:7px;background:#fff;border-radius:50%;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.2}}
+.team{display:flex;align-items:center;gap:10px;padding:7px 0}
+.team+.team{border-top:1px dashed var(--line)}
+.team img,.team .ph{width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--bg);flex:none}
+.team .ph{display:grid;place-items:center;font-size:11px;color:var(--sand);border:1px solid var(--line)}
+.team b{flex:1;font-weight:600}
+.score{font-family:'Big Shoulders Display',sans-serif;font-weight:700;font-size:26px;color:var(--light);text-align:right;line-height:1.1}
+.score small{display:block;font-family:'Hind Siliguri';font-size:12px;color:var(--mute);font-weight:400}
+.status{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:14px;color:var(--sand)}
+.note{background:var(--panel);border:1px dashed var(--light);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:14px;color:var(--sand)}
+.empty,.err{padding:40px 10px;text-align:center;color:var(--mute)}
+footer{margin-top:40px;color:var(--mute);font-size:13px;text-align:center}
+@media (prefers-reduced-motion:reduce){.ball,.live i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="ball"></span>পিচ রিপোর্ট</div>
+    <button class="refresh" id="refresh">রিফ্রেশ</button>
+  </header>
+
+  <section class="hero">
+    <h1>মাঠের খবর,<br>সবার আগে।</h1>
+    <p id="updated">লোড হচ্ছে…</p>
+  </section>
+
+  <div id="note"></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-t="live" aria-selected="true">লাইভ</button>
+    <button class="tab" role="tab" data-t="upcoming" aria-selected="false">আসন্ন</button>
+    <button class="tab" role="tab" data-t="done" aria-selected="false">ফলাফল</button>
+  </div>
+
+  <main id="list" class="grid"></main>
+
+  <footer>ডেটা: CricAPI (cricketdata.org)</footer>
+</div>
+
+<script>
+// 1) cricketdata.org থেকে ফ্রি API key নিয়ে এখানে বসাও
+const API_KEY = "";
+const URL_ = "https://api.cricapi.com/v1/currentMatches?offset=0&apikey=" + API_KEY;
+
+// API key না থাকলে এই ডেমো ডেটা দেখাবে
+const DEMO = [
+ {name:"India vs Bangladesh, 2nd Test",matchType:"test",status:"Day 3: India lead by 140 runs",venue:"Dhaka",matchStarted:true,matchEnded:false,
+  teamInfo:[{name:"India",shortname:"IND"},{name:"Bangladesh",shortname:"BAN"}],
+  score:[{r:412,w:9,o:118.2,inning:"India Inning 1"},{r:272,w:6,o:80,inning:"Bangladesh Inning 1"}]},
+ {name:"Pakistan vs Australia, 1st T20I",matchType:"t20",status:"Pakistan need 24 runs in 18 balls",venue:"Lahore",matchStarted:true,matchEnded:false,
+  teamInfo:[{name:"Pakistan",shortname:"PAK"},{name:"Australia",shortname:"AUS"}],
+  score:[{r:178,w:6,o:20,inning:"Australia Inning 1"},{r:155,w:4,o:17,inning:"Pakistan Inning 1"}]},
+ {name:"England vs South Africa, 3rd ODI",matchType:"odi",status:"Starts tomorrow",venue:"Leeds",matchStarted:false,matchEnded:false,
+  teamInfo:[{name:"England",shortname:"ENG"},{name:"South Africa",shortname:"SA"}],score:[]},
+ {name:"Sri Lanka vs Afghanistan, 2nd T20I",matchType:"t20",status:"Sri Lanka won by 5 wickets",venue:"Colombo",matchStarted:true,matchEnded:true,
+  teamInfo:[{name:"Sri Lanka",shortname:"SL"},{name:"Afghanistan",shortname:"AFG"}],
+  score:[{r:142,w:9,o:20,inning:"Afghanistan Inning 1"},{r:143,w:5,o:18.3,inning:"Sri Lanka Inning 1"}]}
+];
+
+let matches = [], tab = "live";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function kind(m){ return m.matchEnded ? "done" : m.matchStarted ? "live" : "upcoming"; }
+
+function teamRow(t, m){
+  const key = (t.name || "").toLowerCase();
+  const sc = (m.score || []).filter(s => (s.inning || "").toLowerCase().startsWith(key));
+  const txt = sc.map(s => `${s.r}/${s.w}`).join(" & ");
+  const ov = sc.length ? `ওভার ${sc[sc.length-1].o}` : "";
+  const logo = t.img ? `<img src="${esc(t.img)}" alt="" loading="lazy">` : `<span class="ph">${esc(t.shortname||"")}</span>`;
+  return `<div class="team">${logo}<b>${esc(t.name)}</b><div class="score">${txt || "–"}<small>${ov}</small></div></div>`;
+}
+
+function card(m){
+  const k = kind(m);
+  const badge = k === "live" ? `<span class="live"><i></i>লাইভ</span>` : "";
+  const teams = (m.teamInfo && m.teamInfo.length ? m.teamInfo : (m.teams||[]).map(n => ({name:n})))
+    .map(t => teamRow(t, m)).join("");
+  return `<article class="card">
+    <div class="meta"><span class="fmt">${esc((m.matchType||"").toUpperCase())}</span>${badge}</div>
+    ${teams}
+    <div class="status">${esc(m.status)}</div>
+    <div class="meta" style="margin:8px 0 0">${esc(m.venue||"")}</div>
+  </article>`;
+}
+
+function render(){
+  const items = matches.filter(m => kind(m) === tab);
+  $("#list").innerHTML = items.length ? items.map(card).join("")
+    : `<div class="empty" style="grid-column:1/-1">এই মুহূর্তে কোনো ম্যাচ নেই।</div>`;
+}
+
+async function load(){
+  $("#updated").textContent = "আপডেট হচ্ছে…";
+  if (!API_KEY){
+    matches = DEMO;
+    $("#note").innerHTML = `<div class="note">এটা ডেমো ডেটা। <code>index.html</code>-এ <code>API_KEY</code> বসালে আসল লাইভ স্কোর আসবে।</div>`;
+  } else {
+    try{
+      const r = await fetch(URL_);
+      const j = await r.json();
+      if (j.status !== "success") throw new Error(j.reason || "API error");
+      matches = j.data || [];
+      $("#note").innerHTML = "";
+    }catch(e){
+      $("#list").innerHTML = `<div class="err" style="grid-column:1/-1">ডেটা আনা যায়নি: ${esc(e.message)}</div>`;
+      $("#updated").textContent = "ব্যর্থ হয়েছে";
+      return;
+    }
+  }
+  render();
+  $("#updated").textContent = "শেষ আপডেট: " + new Date().toLocaleTimeString("bn-BD");
+}
+
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+  tab = b.dataset.t;
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === b));
+  render();
+});
+$("#refresh").onclick = load;
+load();
+setInterval(load, 5 * 60 * 1000); // ফ্রি প্ল্যানে দৈনিক লিমিট আছে, তাই ৫ মিনিট
+</script>
+</body>
+</html>
